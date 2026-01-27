@@ -5,9 +5,11 @@ edition = "2024"
 
 [dependencies]
 axum = "0.7"
+anchor-lang = "0.32.1"
 tokio = { version = "1", features = ["full"] }
 solana-client = "1.18"
 solana-sdk = "1.18"
 serde = { version = "1", features = ["derive"] }
 tracing = "0.1"
+base64 = "0.21"
 
