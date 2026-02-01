@@ -3,11 +3,37 @@ use solana_sdk::pubkey::Pubkey;
 use anchor_lang::prelude::*;
 use base64::{engine::general_purpose, Engine as _};
 use borsh::BorshDeserialize;
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, BorshDeserialize)]
 pub struct OrderCreated {
     pub order: Pubkey,
+    pub order_id: u64,
+    pub customer: Pubkey,
     pub amount: u64,
+}
+
+#[derive(Debug, BorshDeserialize)]
+pub struct OrderAccepted {
+    pub order: Pubkey,
+    pub courier: Pubkey,
+}
+
+#[derive(Debug, BorshDeserialize)]
+pub struct OrderCompleted {
+    pub order: Pubkey,
+    pub order_id: u64,
+    pub courier: Pubkey,
+    pub amount: u64,
+}
+
+fn event_discriminator(name: &str) -> [u8; 8] {
+    let mut hasher = Sha256::new();
+    hasher.update(format!("event:{}", name));
+    let hash = hasher.finalize();
+    let mut disc = [0u8; 8];
+    disc.copy_from_slice(&hash[..8]);
+    disc
 }
 
 
@@ -29,28 +55,38 @@ pub fn listen(program_id: Pubkey) {
     for msg in receiver {
         for log in &msg.value.logs {
             if let Some(base64_data) = log.strip_prefix("Program data: ") {
-                match general_purpose::STANDARD.decode(base64_data) {
-                    Ok(bytes) => {
-                        if bytes.len() < 8 {
-                            eprintln!("Invalid event bytes: too short");
-                            continue;
-                        }
+                let Ok(bytes) = general_purpose::STANDARD.decode(base64_data) else {
+                    continue;
+                };
 
-                        // 去掉 8 byte discriminator
-                        let struct_bytes = &bytes[8..];
-
-                        match OrderCreated::try_from_slice(struct_bytes) {
-                            Ok(event) => println!("🔥 OrderCreated event: {:?}", event),
-                            Err(e) => eprintln!("Failed to deserialize OrderCreated: {:?}", e),
-                        }
-                    }
-                    Err(e) => eprintln!("Failed to decode base64: {:?}", e),
+                if bytes.len() < 8 {
+                    continue;
                 }
-            } else {
-                println!("LOG: {}", log);
+
+                let (disc, data) = bytes.split_at(8);
+
+                if disc == event_discriminator("OrderCreated") {
+                    match OrderCreated::try_from_slice(data) {
+                        Ok(e) => println!("🆕 OrderCreated: {:?}", e),
+                        Err(err) => eprintln!("Decode OrderCreated failed: {:?}", err),
+                    }
+                } 
+                else if disc == event_discriminator("OrderAccepted") {
+                    match OrderAccepted::try_from_slice(data) {
+                        Ok(e) => println!("🤝 OrderAccepted: {:?}", e),
+                        Err(err) => eprintln!("Decode OrderAccepted failed: {:?}", err),
+                    }
+                } 
+                else if disc == event_discriminator("OrderCompleted") {
+                    match OrderCompleted::try_from_slice(data) {
+                        Ok(e) => println!("✅ OrderCompleted: {:?}", e),
+                        Err(err) => eprintln!("Decode OrderCompleted failed: {:?}", err),
+                    }
+                }
             }
         }
     }
+
 }
 
 #[tokio::main]
