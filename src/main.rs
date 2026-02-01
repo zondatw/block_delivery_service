@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 use base64::{engine::general_purpose, Engine as _};
 use borsh::BorshDeserialize;
 use sha2::{Digest, Sha256};
+use std::env;
 
 #[derive(Debug, BorshDeserialize)]
 pub struct OrderCreated {
@@ -37,12 +38,10 @@ fn event_discriminator(name: &str) -> [u8; 8] {
 }
 
 
-pub fn listen(program_id: Pubkey) {
-    let url = "ws://127.0.0.1:8900";
-
+pub fn listen(ws_url: String, program_id: Pubkey) {
     let (_client, receiver) =
         PubsubClient::logs_subscribe(
-            url,
+            &ws_url,
             solana_client::rpc_config::RpcTransactionLogsFilter::Mentions(vec![
                 program_id.to_string(),
             ]),
@@ -50,7 +49,10 @@ pub fn listen(program_id: Pubkey) {
         )
         .unwrap();
 
-    println!("Listening Solana events...");
+    println!(
+        "Listening Solana events on {} for program {}",
+        ws_url, program_id
+    );
 
     for msg in receiver {
         for log in &msg.value.logs {
@@ -91,10 +93,27 @@ pub fn listen(program_id: Pubkey) {
 
 #[tokio::main]
 async fn main() {
-    let program_id = "YourProgramIdHere".parse().unwrap();
+    // 1️⃣ Program ID
+    let program_id_str =
+        env::var("PROGRAM_ID").expect("PROGRAM_ID env var not set");
+
+    let program_id: Pubkey = program_id_str
+        .parse()
+        .expect("Invalid PROGRAM_ID");
+
+    // 2️⃣ WebSocket URL
+    let ws_url =
+        env::var("WS_URL").unwrap_or_else(|_| "ws://127.0.0.1:8900".to_string());
+
+    println!("PROGRAM_ID = {}", program_id);
+    println!("WS_URL     = {}", ws_url);
+
     std::thread::spawn(move || {
-        listen(program_id);
+        listen(ws_url, program_id);
     });
 
-    loop {}
+    // keep process alive without busy loop
+    loop {
+        std::thread::park();
+    }
 }
