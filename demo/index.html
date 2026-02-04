@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>📦 Order Monitor</title>
+  <style>
+    body { font-family: monospace; background: #f5f5f5; padding: 20px; }
+    .card { background: white; padding: 10px; margin-bottom: 10px; border-radius: 6px; }
+    .created { border-left: 5px solid #2196f3; }
+    .accepted { border-left: 5px solid #ff9800; }
+    .completed { border-left: 5px solid #4caf50; }
+  </style>
+</head>
+<body>
+
+<h1>📡 Solana Order Monitor</h1>
+
+<div id="events"></div>
+
+<script>
+  const ws = new WebSocket("ws://localhost:3000/ws");
+  const container = document.getElementById("events");
+
+  ws.onmessage = (ev) => {
+    const data = JSON.parse(ev.data);
+
+    const div = document.createElement("div");
+    div.className = "card " + data.type.toLowerCase();
+
+    div.innerText = JSON.stringify(data, null, 2);
+    container.prepend(div);
+  };
+</script>
+
+</body>
+</html>
