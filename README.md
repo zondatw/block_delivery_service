@@ -8,3 +8,5 @@ export WS_URL=ws://127.0.0.1:8900
 cargo run
 
 ```
+
+[demo website](./demo/index.html)
